@@ -1,32 +1,59 @@
 
 import numpy as np
+import numpy.typing as npt
 from scipy import signal
 
 
+
 class FilterBank:
-    def __init__(self, N, num_taps):
-        self.N = N # Number of sub-bands
-        self.num_taps = num_taps # Number of filter coefficents
-        self.filters = np.zeros((N, num_taps)) # Array of bandpass filters
+    # Base Class for Filterbanks
 
-    def retrieve(self, k):
-        return self.filters[k]
+    def __init__(self, N: int, P: int) -> None:
+        self.N: int = N # Number of samples for each branch (also the FFT size), should be a power of 2
+        self.P: int = P # Number of "subfilters" or "branches"
 
 
-class Analysis(FilterBank):
-    def __init__(self, N, num_taps, f_s):
-        super().__init__(N, num_taps)
 
-        # Make the bandpass filters
-        for n in range(N):
-            self.filters[n] = signal.remez(num_taps, [0, (((n/N)*20000)+20)-.1, ((n/N)*20000)+20, ((n+1)/N)*20000, (((n+1)/N)*20000)+.1, 20010], [0, 1, 0], fs=f_s, type="bandpass")
-            
+class PolyphaseFilterBank(FilterBank):
+    # Danny C. Price, Spectrometers and Polyphase Filterbanks in Radio Astronomy, 2016. Available online at: http://arxiv.org/abs/1607.03579
 
-class Synthesis(FilterBank):
-    def __init__(self, N, num_taps, f_s):
-        super().__init__(N, num_taps)
+    def __init__(self, N: int, P: int) -> None:
+        super().__init__(N, P)
 
-        # Make the bandpass filters
-        for n in range(N):
-            self.filters[n] = signal.remez(num_taps, [0, (((n/N)*20000)+20)-.1, ((n/N)*20000)+20, ((n+1)/N)*20000, (((n+1)/N)*20000)+.1, 20010], [0, 1, 0], fs=f_s, type="bandpass")
-    
+    def generate_window(self, window_type: str="hamming") -> npt.NDArray:
+        # Generates a windowed sinc
+        window_taps: npt.NDArray = signal.get_window(window_type, self.N*self.P)
+        sinc: npt.NDArray = signal.firwin(self.N*self.P, 1.0/self.P, window="rectangular")
+        window_taps *= sinc
+        return window_taps
+
+
+
+    def pfb_frontend(self, signal: npt.NDArray) -> npt.NDArray:
+        num_windows: int = int(signal.shape[0] / (self.N * self.P))
+
+        # Generate our window filter
+        window: npt.NDArray = self.generate_window()
+
+        # Apply our window filter onto our signal
+        y: npt.NDArray = signal*window # Dimension of N x P
+
+        # Split the result of signal*window into P branches via polyphase decomposition
+        y = y.reshape(self.P, int(y.shape[0]/self.P))
+
+        # Sum up our branches
+        y = y.sum(axis=0)
+        
+        return y
+
+    def pfb_filterbank(self, signal: npt.NDArray) -> npt.NDArray:
+        frontend: npt.NDArray = self.pfb_frontend(signal)
+        filterbank: npt.NDArray = np.fft.rfft(frontend, n=self.P)
+        return filterbank
+
+
+
+
+class MelFilterbank(FilterBank):
+    def __init__(self, N: int, P: int) -> None:
+        super().__init__(N, P)
