@@ -2,15 +2,33 @@
 import numpy as np
 import numpy.typing as npt
 from scipy import signal
+import matplotlib.pyplot as plt
 
+
+
+def db_power(signal: npt.NDArray) -> npt.NDArray:
+    # Assumes that the signal is already in terms of power, i.e magnitude squared
+    return 10*np.log10(signal)
 
 
 class FilterBank:
     # Base Class for Filterbanks
 
     def __init__(self, N: int, P: int) -> None:
-        self.N: int = N # Number of samples for each branch (also the FFT size), should be a power of 2
-        self.P: int = P # Number of "subfilters" or "branches"
+        self.N: int = N # Number of polyphase sub-filters
+        self.P: int = P # Number of taps in each polyphase sub-filters, also is the size of the FFT which we take at the end
+        self.M: int = N * P # Size of each chunk of samples (we block process our signal). This requires our input signal to be some multiple of M
+        self.L: int = 0 # Size of our input signal, must be a multiple of M
+        self.W: int = int(self.L / self.M) # Number of data chunks we split our input signal into
+
+    def __repr__(self) -> str:
+        ret_str: str = f"N: {self.N}\n"
+        ret_str += f"P: {self.P}\n"
+        ret_str += f"M: {self.M}\n"
+        ret_str += f"L: {self.L}\n"
+        ret_str += f"W: {self.W}\n"
+        return ret_str
+
 
 
 
@@ -21,35 +39,54 @@ class PolyphaseFilterBank(FilterBank):
         super().__init__(N, P)
 
     def generate_window(self, window_type: str="hamming") -> npt.NDArray:
-        # Generates a windowed sinc
-        window_taps: npt.NDArray = signal.get_window(window_type, self.N*self.P)
-        sinc: npt.NDArray = signal.firwin(self.N*self.P, 1.0/self.P, window="rectangular")
-        window_taps *= sinc
-        return window_taps
+        # Generates a windowed sinc of size M which will act as our "filter"
+
+        window: npt.NDArray = signal.get_window(window_type, self.M)
+        # sinc: npt.NDArray = signal.firwin(self.N*self.P, 1.0/self.P, window="rectangular")
+        # We choose a sinc as our window function because we want the frequency response of each of our bins to be as close to a rect as possible
+        sinc: npt.NDArray = np.sinc(np.linspace(-40, 40, num=self.M))
+        window *= sinc
+        return window.reshape(-1, 1) # Reshape into M x 1
 
 
+    def pfb_frontend(self, signal: npt.NDArray) -> list[npt.NDArray]:
+        self.L = signal.shape[0]
+        self.W = int(self.L / self.M)
 
-    def pfb_frontend(self, signal: npt.NDArray) -> npt.NDArray:
-        num_windows: int = int(signal.shape[0] / (self.N * self.P))
+        print(self)
+        # Generate our window filter -> M x 1
+        W: npt.NDArray = self.generate_window()
 
-        # Generate our window filter
-        window: npt.NDArray = self.generate_window()
+        # Split our input signal into W data chunks each with size M via polyphase decomposition -> M x W
+        X: npt.NDArray = signal.reshape(self.M, self.W)
 
-        # Apply our window filter onto our signal
-        y: npt.NDArray = signal*window # Dimension of N x P
+        # Element wise multiply our winodw to each of our W data chunks
+        Q: npt.NDArray = W * X # Windowed data -> M x W
 
-        # Split the result of signal*window into P branches via polyphase decomposition
-        y = y.reshape(self.P, int(y.shape[0]/self.P))
+        # Split a data chunk into N branches each with P samples and then sum up all the branches, do this for all W data chunks inside Q
+        Y: list[npt.NDArray] = []
+        for w in range(self.W):
+            branches: list[npt.NPArray] = np.split(Q[:, w], self.N)
+            summed_branches: npt.NPArray = sum(branches)
+            Y.append(summed_branches)
 
-        # Sum up our branches
-        y = y.sum(axis=0)
-        
-        return y
+        return Y
 
-    def pfb_filterbank(self, signal: npt.NDArray) -> npt.NDArray:
-        frontend: npt.NDArray = self.pfb_frontend(signal)
-        filterbank: npt.NDArray = np.fft.rfft(frontend, n=self.P)
+
+    def pfb_filterbank(self, signal: npt.NDArray) -> list[npt.NDArray]:
+        frontend: list[npt.NDArray] = self.pfb_frontend(signal)
+        filterbank: list[npt.NDArray] = [np.fft.rfft(i, n=self.P) for i in frontend]
         return filterbank
+
+
+    def graph_pfb(self, pfb: npt.NDArray) -> None:
+        # Get power spectral density of our fft
+        pfb_psd: npt.NDArray = abs(pfb)**2
+
+        plt.plot(pfb_psd)
+        plt.show()
+
+
 
 
 
