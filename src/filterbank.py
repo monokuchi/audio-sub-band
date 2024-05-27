@@ -60,7 +60,7 @@ class PolyphaseFilterBank(FilterBank):
         # Split our input signal into W data chunks each with size M via polyphase decomposition -> M x W
         X: npt.NDArray = signal.reshape(self.M, self.W)
 
-        # Element wise multiply our winodw to each of our W data chunks
+        # Element wise multiply our window to each of our W data chunks
         Q: npt.NDArray = W * X # Windowed data -> M x W
 
         # Split a data chunk into N branches each with P samples and then sum up all the branches, do this for all W data chunks inside Q
