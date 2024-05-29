@@ -7,7 +7,17 @@ import matplotlib.pyplot as plt
 
 
 def db_power(signal: npt.NDArray) -> npt.NDArray:
-    # Assumes that the signal is already in terms of power, i.e magnitude squared
+    """Converts signal into dB scale
+
+    Assumes that the signal is already in terms of power, i.e magnitude squared
+
+    Args:
+        signal (np.array): Input signal
+
+    Returns:
+        np.array: Signal in dB scale
+    """
+
     return 10*np.log10(signal)
 
 
@@ -39,7 +49,14 @@ class PolyphaseFilterBank(FilterBank):
         super().__init__(N, P)
 
     def generate_window(self, window_type: str="hamming") -> npt.NDArray:
-        # Generates a windowed sinc of size M which will act as our "filter"
+        """Generates a windowed sinc of size M x 1 which will act as our "filter"
+
+        Args:
+            window_type (str): Type of window you want to generate (default "hamming")
+
+        Returns:
+            window (np.array): Window filter of size M x 1
+        """
 
         window: npt.NDArray = signal.get_window(window_type, self.M)
         # sinc: npt.NDArray = signal.firwin(self.N*self.P, 1.0/self.P, window="rectangular")
@@ -50,6 +67,15 @@ class PolyphaseFilterBank(FilterBank):
 
 
     def pfb_frontend(self, signal: npt.NDArray) -> list[npt.NDArray]:
+        """Polyphase filter frontend
+
+        Args:
+            signal (np.array): Input signal
+
+        Returns:
+            list[np.array]: List of each of our data chunks which are filtered, split up, then summed
+        """
+
         self.L = signal.shape[0]
         self.W = int(self.L / self.M)
 
@@ -74,14 +100,31 @@ class PolyphaseFilterBank(FilterBank):
 
 
     def pfb_filterbank(self, signal: npt.NDArray) -> list[npt.NDArray]:
+        """Returns a complete polyphase filterbank
+
+        Args:
+            signal (np.array): Input signal
+
+        Returns:
+            filterbank (list[np.array]): Our filterbank
+        """
+
         frontend: list[npt.NDArray] = self.pfb_frontend(signal)
         filterbank: list[npt.NDArray] = [np.fft.rfft(i, n=self.P) for i in frontend]
         return filterbank
 
 
     def graph_pfb(self, pfb: npt.NDArray) -> None:
+        """Graphs the power spectrum of a polyphase filterbank
+        Args:
+            pfb (np.array): Input polyphase filterbank
+
+        Returns:
+            None
+        """
+
         # Get power spectral density of our fft
-        pfb_psd: npt.NDArray = abs(pfb)**2
+        pfb_psd: npt.NDArray = db_power(abs(pfb)**2)
 
         plt.plot(pfb_psd)
         plt.show()

@@ -19,8 +19,17 @@ def plot_response(w, h, title):
 
 
 
-def padpower2(A):
-    return np.pad(A, (0, int(2**np.ceil(np.log2(len(A)))) - len(A)), "constant")
+def padpower2(x):
+    """Pads signal to the next highest power of 2
+
+    Args:
+        x (np.array): Input signal
+
+    Returns:
+        np.array: Padded signal
+    """
+
+    return np.pad(x, (0, int(2**np.ceil(np.log2(len(x)))) - len(x)), "constant")
 
 
 def main():
@@ -39,8 +48,9 @@ def main():
     plt.legend()
     plt.xlabel("Time [Sec]")
     plt.ylabel("Amplitude")
-    plt.savefig("../figures/audio_plot_time.jpg")
-    plt.clf()
+    plt.show()
+    # plt.savefig("../figures/audio_plot_time.jpg")
+    # plt.clf()
 
 
 
