@@ -83,6 +83,13 @@ class PolyphaseFilterBank(FilterBank):
         # Generate our window filter -> M x 1
         W: npt.NDArray = self.generate_window()
 
+
+        plt.plot(signal)
+        plt.plot(W)
+        plt.show()
+
+
+
         # Split our input signal into W data chunks each with size M via polyphase decomposition -> M x W
         X: npt.NDArray = signal.reshape(self.M, self.W)
 
@@ -106,11 +113,11 @@ class PolyphaseFilterBank(FilterBank):
             signal (np.array): Input signal
 
         Returns:
-            filterbank (list[np.array]): Our filterbank
+            filterbank (list[np.array]): Returns a list of our filterbanks
         """
 
         frontend: list[npt.NDArray] = self.pfb_frontend(signal)
-        filterbank: list[npt.NDArray] = [np.fft.rfft(i, n=self.P) for i in frontend]
+        filterbank: list[npt.NDArray] = [np.fft.rfft(i, n=self.N) for i in frontend]
         return filterbank
 
 
@@ -125,8 +132,9 @@ class PolyphaseFilterBank(FilterBank):
 
         # Get power spectral density of our fft
         pfb_psd: npt.NDArray = db_power(abs(pfb)**2)
-
         plt.plot(pfb_psd)
+        plt.xlabel("FFT Bin")
+        plt.ylabel("Power [dB]")
         plt.show()
 
 

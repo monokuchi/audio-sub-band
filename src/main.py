@@ -1,5 +1,6 @@
 
 import numpy as np
+import numpy.typing as npt
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy import signal
@@ -19,7 +20,7 @@ def plot_response(w, h, title):
 
 
 
-def padpower2(x):
+def padpower2(x: npt.NDArray):
     """Pads signal to the next highest power of 2
 
     Args:
@@ -55,28 +56,17 @@ def main():
 
 
 
-
-    # padded_audio_data = padpower2(audio_data[:, 0])
-
-    P = 256
-    N = 4
-    padded_audio_data = np.sin(np.arange(0, N*P*2) / np.pi)
+    P = 4
+    N = 256
+    padded_audio_data = padpower2(audio_data[:, 0])
+    # padded_audio_data = np.sin(np.arange(0, N*P*10) / np.pi)
     polyphase_bank = filterbank.PolyphaseFilterBank(N, P)
 
 
+    filter_banks = polyphase_bank.pfb_filterbank(padded_audio_data)
 
-
-    # plt.subplot(2, 1, 1)
-    # plt.plot(padded_audio_data)
-    # plt.subplot(2, 1, 2)
-    # plt.plot(polyphase_bank.generate_window())
-    # plt.show()
-
-    p = polyphase_bank.pfb_filterbank(padded_audio_data)
-
-
-    for pfp in p:
-        polyphase_bank.graph_pfb(pfp)
+    concatenated_filter_banks = np.concatenate(filter_banks)
+    polyphase_bank.graph_pfb(concatenated_filter_banks)
 
 
 if __name__ == "__main__":
